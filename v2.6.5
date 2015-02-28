@@ -1,0 +1,145 @@
+///////////////////////////////////////////////////////////////////////
+// Author: Enkeleid Hasko 											 //
+// Contact Info: ehasko@gmail.com, (347) 772-6987                    //
+//																	 //
+// Program Description:											     //
+// RF Project - this program compares the Registrar's database with  //
+// the Active Directory database and determines whether a record     //
+// should be added or removed from the AD.                           //
+//                                                                   //
+// Compiled with Code::blocks v13.12 on Windows 7 x64 SP1            //
+// v2.6 - Dec. 16, 2014                                              //
+///////////////////////////////////////////////////////////////////////
+
+
+#include <iostream>
+#include <cstring>
+#include <fstream>
+#include <algorithm>
+#include <map>
+
+using namespace std;
+
+map<int,string> master_keys;
+map<int,string> ad_keys;
+
+// FUNCTION PROTOTYPES
+
+int get_key(string);                                                    // fetches the key from each student record
+void load_records(ifstream &, map<int,string> &);                       // loads records into the memory
+char* parse_keys(char*);                                                // removes the "-" tokens from the key
+void _process_keys(ofstream &, map<int,string> &, map<int,string> &);   // compares the 2 databases and decides which elements to ADD/REMOVE to/from AD
+
+int main ()
+{
+    ifstream master_db("master.txt");                                   // opens masters' database
+    ifstream ad_db("ad.txt");
+
+    ofstream add_to_AD("to add to AD.txt");                             // opens text file to dump records to add to the Active Directory
+    ofstream remove_from_AD("to remove from AD.txt");
+
+    load_records(master_db, master_keys);
+    load_records(ad_db, ad_keys);
+
+    cout << "the # of keys inside the master db is: " << master_keys.size() << endl;
+
+    cout << "the # of keys inside the ad db is: " << ad_keys.size() << endl;
+
+    _process_keys(add_to_AD, master_keys, ad_keys);                     // compares master_keys against ad_keys
+    _process_keys(remove_from_AD, ad_keys, master_keys);
+
+    return 0;
+}
+
+// FUNCTION DEFINITIONS
+
+// loads records into the memory: it takes in the name of the file to be opened AND the name of the vector
+// where the records will be stored;
+void load_records (ifstream & database, map<int,string> &key)
+{
+    string student, rec;                                                // holds an entire record
+
+    //getline(database, student);                                       // ignores the HEADER line in the .txt file
+    while (!database.eof())
+    {
+        getline(database, student);                                     // store record into student string
+
+        // To avoid get_key() function to affect the string student by removing the tokens
+        // when inserting it as the 2nd argument of the pair into the map, I convert student into
+        // a c string first and assign it to a new string which I called rec;
+        rec = student.c_str();
+
+        //cout << student << endl;              // DEBUGGING
+
+        // had I passed student as the 2nd argument here instead of rec, the string student would have lost all the tokens
+        key.insert(pair<int, string> (get_key(student), rec));
+    }
+
+    database.close();
+
+}
+
+// fetches the key from each student record: it takes in the full student record AND the
+// vector where to store the key;
+int get_key (string record)
+{
+    int sub_str = 1;                                     // record substring counter: the key is the 6th substring in the record
+
+    char *token = strtok((char*)record.c_str(), ",");    // converts my string into a pointer to a c string, and parses it using commas as delimiters
+
+    while (token!= NULL)                                 // as long as there is a string to read...
+    {
+        if (sub_str == 6)                                // the substring holding the key is the last (or the 6th in other words)
+            return atoi(parse_keys(token));              // converts the 6th substring into a number and makes it ready to be inserted into the map
+
+        token = strtok(NULL, ",");                       // processes the next substring
+
+        ++sub_str;
+    }
+}
+
+// removes the '-' tokens from the key
+char* parse_keys (char *p)
+{
+    char *sub_key = strtok(p, "-");                 // stores the partial key substrings into sub_key
+
+    string key;                                     // string used to rebuild the key without the "-" tokens
+
+    int token = 1;                                  // every key has 3 numerical tokens and 2 delimiters: token
+
+    key = sub_key;                                  // the key is built again into the string named key
+
+    while (sub_key!= NULL)
+    {
+        if (token == 3)
+            return (char*)key.c_str();              // after fetching the last token in the key, return the key
+
+        sub_key = strtok(NULL, "-");
+
+        key+= sub_key;                              // rebuild the key without the delimiters
+
+        ++token;
+    }
+}
+
+
+void _process_keys (ofstream &dump, map<int,string> &db_1, map<int,string> &db_2)
+{
+    // cout << endl;
+
+    // cout << "*******************TO ADD TO THE ACTIVE DIRECTORY*******************" << endl << endl;
+
+    for (map<int,string>::iterator it = db_1.begin(); it != db_1.end(); ++it)   // scans all the pairs in the map
+    {
+        // CONDITION for no match: if the key from master's db is not in ad's db, it needs to be added (_process_keys(add_to_AD, master_keys, ad_keys));
+        // viceversa, if the key from the active directory is not in master's db, it needs to be removed (_process_keys(remove_from_AD, ad_keys, master_keys));
+        // the operand db_2.end() means that the find function has scanned all the elements in the db_2 database
+        // and has arrived at the end of the map because there was no match;
+        if (db_2.find(it -> first) == db_2.end())
+        {
+            dump << (it -> second) << endl;    // dump the records to be added to the active directory into a .txt file
+
+            // cout << (it -> second) << endl;     // DEBUGGING
+        }
+    }
+}
