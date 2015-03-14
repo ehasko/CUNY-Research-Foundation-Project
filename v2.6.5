@@ -8,7 +8,7 @@
 // should be added or removed from the AD.                           //
 //                                                                   //
 // Compiled with Code::blocks v13.12 on Windows 7 x64 SP1            //
-// v2.6 - Dec. 16, 2014                                              //
+// v2.6.5 - March 1, 2015                                            //
 ///////////////////////////////////////////////////////////////////////
 
 
@@ -28,7 +28,7 @@ map<int,string> ad_keys;
 int get_key(string);                                                    // fetches the key from each student record
 void load_records(ifstream &, map<int,string> &);                       // loads records into the memory
 char* parse_keys(char*);                                                // removes the "-" tokens from the key
-void _process_keys(ofstream &, map<int,string> &, map<int,string> &);   // compares the 2 databases and decides which elements to ADD/REMOVE to/from AD
+void _process_keys(ofstream &, map<int,string> &, map<int,string> &, string);   // compares the 2 databases and decides which elements to ADD/REMOVE to/from AD
 
 int main ()
 {
@@ -38,6 +38,9 @@ int main ()
     ofstream add_to_AD("to add to AD.txt");                             // opens text file to dump records to add to the Active Directory
     ofstream remove_from_AD("to remove from AD.txt");
 
+    string add = "add";                                                 // passed to the _process_keys function and used to display the # of records that need to be added to the AD
+    string del = "del";
+
     load_records(master_db, master_keys);
     load_records(ad_db, ad_keys);
 
@@ -45,8 +48,8 @@ int main ()
 
     cout << "the # of keys inside the ad db is: " << ad_keys.size() << endl;
 
-    _process_keys(add_to_AD, master_keys, ad_keys);                     // compares master_keys against ad_keys
-    _process_keys(remove_from_AD, ad_keys, master_keys);
+    _process_keys(add_to_AD, master_keys, ad_keys, add);                     // compares master_keys against ad_keys
+    _process_keys(remove_from_AD, ad_keys, master_keys, del);
 
     return 0;
 }
@@ -63,16 +66,23 @@ void load_records (ifstream & database, map<int,string> &key)
     while (!database.eof())
     {
         getline(database, student);                                     // store record into student string
-
+        if(student == "")												// discards empty lines in the text file
+        {
+            continue;
+        }
+        else
+        {
         // To avoid get_key() function to affect the string student by removing the tokens
         // when inserting it as the 2nd argument of the pair into the map, I convert student into
         // a c string first and assign it to a new string which I called rec;
-        rec = student.c_str();
+            rec = student.c_str();
 
         //cout << student << endl;              // DEBUGGING
 
         // had I passed student as the 2nd argument here instead of rec, the string student would have lost all the tokens
-        key.insert(pair<int, string> (get_key(student), rec));
+            key.insert(pair<int, string> (get_key(student), rec));
+        }
+
     }
 
     database.close();
@@ -105,7 +115,7 @@ char* parse_keys (char *p)
 
     string key;                                     // string used to rebuild the key without the "-" tokens
 
-    int token = 1;                                  // every key has 3 numerical tokens and 2 delimiters: token
+    int token = 1;                                  // every key has 3 numerical tokens and 2 delimiters
 
     key = sub_key;                                  // the key is built again into the string named key
 
@@ -123,11 +133,9 @@ char* parse_keys (char *p)
 }
 
 
-void _process_keys (ofstream &dump, map<int,string> &db_1, map<int,string> &db_2)
+void _process_keys (ofstream &dump, map<int,string> &db_1, map<int,string> &db_2, string operation)
 {
-    // cout << endl;
-
-    // cout << "*******************TO ADD TO THE ACTIVE DIRECTORY*******************" << endl << endl;
+    int dumpedRecords = 0;                      // counts the # of records that need to be dumped
 
     for (map<int,string>::iterator it = db_1.begin(); it != db_1.end(); ++it)   // scans all the pairs in the map
     {
@@ -138,8 +146,11 @@ void _process_keys (ofstream &dump, map<int,string> &db_1, map<int,string> &db_2
         if (db_2.find(it -> first) == db_2.end())
         {
             dump << (it -> second) << endl;    // dump the records to be added to the active directory into a .txt file
-
+            dumpedRecords++;
             // cout << (it -> second) << endl;     // DEBUGGING
         }
     }
+
+    if(operation == "add") { cout << endl << dumpedRecords << " records need to be added to the AD." << endl; }
+    if(operation == "del"){ cout << endl << dumpedRecords << " records need to be removed from the AD."<< endl;}
 }
